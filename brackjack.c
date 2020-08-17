@@ -4,70 +4,76 @@
 #include <stdlib.h>
 #include <time.h>
 #include <string.h>
-#define    N    52
-#define    MIN    0
-#define    MAX     52
+#define    pi   3.14159  //円周率(描画で使用)
+#define    N    52  //トランプの枚数
+#define    MIN    0  //乱数生成の最小値
+#define    MAX     52  //乱数生成の最大値
+/*トランプのマーク*/
 #define    heart 0
 #define    spade  1
 #define    diamond 2
 #define    club 3
-#define    betting 0
-#define    start  1
-#define    rule 2
-#define    end 3
-#define    gameover 4
-#define    win 0
-#define    lose 1
-#define    draw 2
-#define    brackjack 3
-#define    just 4
-#define    burst 5
+/*ゲームの状態(modeに格納する)*/
+#define    betting 0 //賭け金の設定画面
+#define    start  1  //ゲームのプレイ画面
+#define    rule 2  //ルール説明の画面
+#define    end 3  //ゲームの終了画面
+#define    gameover 4  //ゲームオーバーの画面(手持ちが0になった時)
+/*勝敗*/
+#define    win 0  //勝ち
+#define    lose 1  //負け
+#define    draw 2  //引き分け
+#define    brackjack 3  //配られた時点で21
+#define    just 4  //3枚以上で21ピッタリ
+#define    burst 5  //21を超えた
 char s[4]={0};
-int tip = 5;
-int bet = 0;
-int mode = betting;
-int pmode;
+int tip = 5;  //チップの数(初期状態は5枚)
+int bet = 0;  //ベットする数
+int mode = betting;  //ゲームの状態(初期状態はbetting)
+int pmode;  //前のゲームの状態を保持
 int x,y;
-int errar=1;
-int result1;
+int errar=1;  //賭け金が範囲外の時のエラー判定
+int result1;  //ゲームの結果
+/*トランプの情報*/
 typedef struct cards {
-    char num[3];
-    int mark;
-    int point;
+    char num[3];  //数字1~K
+    int mark;  //マーク(heart,diamond,spade,club)
+    int point;  //点数1~11
 } cards;
-
-cards deck[N];
-cards dealer[12];
-cards player[12];
-int dcount = 0;
-int pcount = 0;
-int d_judge = 0,p_judge = 0;
+cards deck[N];  //山札
+cards dealer[12];  //ディーラーの手札
+cards player[12];  //プレイヤーの手札
+int dcount = 0;  //ディーラーの手札の数
+int pcount = 0;  //プレイヤーの手札の数
+int d_judge = 0,p_judge = 0;  //ディーラーの点数判定、プレイヤーの点数判定
+/*山札を乱数生成*/
 void shuffle(void){
+    /*変数の初期化*/
     if(mode==gameover){tip=5;}
     dcount=0,pcount=0,d_judge=0,p_judge=0,mode=betting,bet=0,result1=10;
     memset(dealer,0,sizeof(dealer));
     memset(player,0,sizeof(player));
-    int rnd;
-    int mark;
-    int bFind;
+    int rnd;  //乱数を格納0~51
+    int bFind;  //既に生成された乱数を探すフラグ
     int i,j;
-    int data[N]={0};
-    srand((unsigned int)time(NULL));
+    int data[N]={0};  //乱数を格納する配列
+    srand((unsigned int)time(NULL));  //seed値を現在時刻に設定
     for(i = 0; i < N; i++){
         do
         {
             bFind = 0;
-            rnd = rand() % (MAX - MIN) + MIN;
-            for(j = 0; j < i; j++){
+            rnd = rand() % (MAX - MIN) + MIN;  //乱数生成
+            for(j = 0; j < i; j++){//同じ乱数がdataにないか確認
                 if(data[j] == rnd){
-                    bFind = 1;
+                    bFind = 1;//見つけたらフラグを立てる
                     break;
                 }
             }
-        }while(bFind);
+        }while(bFind);//同じ乱数がある間繰り返す
         data[i] = rnd;
-        int x = rnd%13+1;
-        switch (x) {
+        int x = rnd%13+1;  //1~13の値がxに格納される。トランプの数字を表す
+        memset(deck[i].num, '\0', sizeof(deck[i].num));  //文字列の初期化
+        switch (x) {//山札に数字と点数の情報を格納
             case 10:
                 deck[i].num[0] = '1';deck[i].num[1] = '0';
                 deck[i].point = 10;
@@ -93,8 +99,8 @@ void shuffle(void){
                 deck[i].point = x;
                 break;
         }
-        mark = rnd/13;
-        switch (mark) {
+        int mark = rnd/13;  //0~3の値がmarkに格納される。トランプのマークを表す
+        switch (mark) {//山札にマークの情報を格納
             case heart:
                 deck[i].mark=heart;
                 break;
@@ -113,17 +119,20 @@ void shuffle(void){
         
     }
 }
+/*カードを配る関数*/
 void deal_card(void){
     dealer[0]=deck[0],dealer[1]=deck[1];
     player[0]=deck[2],player[1]=deck[3];
     dcount+=2;
     pcount+=2;
 }
+/*山札からカードを引く関数*/
 void get_card(cards* deck1,int n){
     static int count = 4;
     deck1[n]=deck[count];
     count++;
 }
+/*文字を表示する関数*/
 void output(double x, double y, char *string)
 {
   int len, i;
@@ -134,13 +143,14 @@ void output(double x, double y, char *string)
     glutBitmapCharacter(GLUT_BITMAP_TIMES_ROMAN_24, string[i]);
   }
 }
+/*ディーラーの手札の点数の判定*/
 int judge_dealer(void){
     int sum=0,i;
-    for(i=0;i<dcount;i++){
+    for(i=0;i<dcount;i++){//手札の合計を出す
         sum += dealer[i].point;
     }
     
-    if(sum>21){
+    if(sum>21){//バーストしてAが11点で計算されている場合、1で計算し直す
         for(i=0;i<dcount;i++){
             if(dealer[i].point==11){
                 dealer[i].point=1;
@@ -148,23 +158,23 @@ int judge_dealer(void){
                 break;
             }
         }
-        if(sum>16){
+        if(sum>16){//それでも合計が17以上の場合1を返す(これ以上引けない)
             return 1;
         }
     }
-    else if(sum>16){
+    else if(sum>16){//バーストしていないが17以上の場合1を返す(これ以上引けない)
         return 1;
     }
     
-    return 0;
+    return 0;//まだ引ける
 }
-
+/*プレイヤーの手札の点数の判定*/
 int judge_player(void){
     int sum=0,i;
-    for(i=0;i<pcount;i++){
+    for(i=0;i<pcount;i++){//手札の合計を出す
         sum += player[i].point;
     }
-    if(sum>21){
+    if(sum>21){//バーストしてAが11点で計算されている場合、1で計算し直す
         for(i=0;i<pcount;i++){
             if(player[i].point==11){
                 player[i].point=1;
@@ -172,65 +182,55 @@ int judge_player(void){
                 break;
             }
         }
-        if(sum>21){
+        if(sum>21){//それでも合計が22以上の場合2を返す(バーストして負け)
             return 2;
         }
-        else if(sum==21){
-            return 1;
-        }
-        return 0;
     }
-    else if(sum==21){
+    else if(sum==21){//21丁度の場合1を返す(ブラックジャックまたはジャスト)
         return 1;
     }
-    return 0;
+    return 0;//まだ引ける
 }
+/*ゲームの結果の判定*/
 int judge_game(void){
-    int dsum=0,psum=0;
-    int i;
-    int result;
-    for(i=0;i<dcount;i++){
-        dsum += dealer[i].point;
-    }
-    for(i=0;i<pcount;i++){
-        psum += player[i].point;
-    }
-    if(dsum!=21&&psum==21){
-        glColor3d(1.0, 0.0, 0.0);
-        if(pcount==2){
+    int dsum=0,psum=0;//両者の合計を格納
+    int result;//結果を格納
+    if(dsum!=21&&psum==21){//プレイヤーのみジャストの場合
+        if(pcount==2){//ブラックジャック
             
             result=brackjack;
-            tip+=(double)bet*2.5;
+            tip+=(double)bet*2.5;//賭け金の1.5倍がもらえる(賭け金も返されるので2.5倍)
         }
-        else{
+        else{//ジャスト
             
             result=just;
-            tip+=(double)bet*2.2;
+            tip+=(double)bet*2.2;//賭け金の1.2倍がもらえる(賭け金も返されるので2.2倍)
         }
     }
-    else if(dsum>21||(dsum<21&&psum>dsum)){
-        tip+=bet*2;
-        result = win;
+    else if(dsum>21||(dsum<=21&&psum>dsum)){//ディーラーがバーストまたはプレイヤーの方が高得点の場合
+        tip+=bet*2;//賭けた分だけもらえる(賭け金も返されるので2倍)
+        result = win;//勝ち
     }
-    else if(dsum==21||(dsum<21&&psum<dsum)){
-        result = lose;
+    else if(psum<dsum){//ディーラーの方が高得点の場合(プレイヤーはバーストした時点で終了する)
+        result = lose;//負け
     }
     else{
-        tip+=bet;
-        result = draw;
+        tip+=bet;//賭け金が戻ってくる
+        result = draw;//引き分け
     }
-    if(tip==0){
+    
+    if(tip==0){//チップが0の場合ゲームオーバー
         mode = gameover;
     }
     else{
-        mode = end;
+        mode = end;//終了
     }
     glutPostRedisplay();
     return result;
 }
+/*ハートを描画する関数*/
 void draw_heart(float cx,float cy){
     int i,n=100;
-    double pi=3.14159;
     double rate;
     float x,y,r=0.05900/2.0;
     glColor3d(1.0, 0.0, 0.0);
@@ -252,6 +252,7 @@ void draw_heart(float cx,float cy){
     }
     glEnd();
 }
+/*ダイアを描画する関数*/
 void draw_diamond(float x,float y){
     glColor3d(1.0, 0.0, 0.0);
     glBegin(GL_POLYGON);
@@ -261,9 +262,9 @@ void draw_diamond(float x,float y){
     glVertex2d(x,  y+0.07);
     glEnd();
 }
+/*クラブを描画する関数*/
 void draw_club(double cx,double cy){
     int i,n=100;
-    double pi=3.14159;
     double rate;
     float x,y,r=0.05800/2.0;
     
@@ -294,9 +295,9 @@ void draw_club(double cx,double cy){
     }
     glEnd();
 }
+/*スペードを描画する関数*/
 void draw_spade(float cx,float cy){
     int i,n=100;
-    double pi=3.14159;
     double rate;
     float x,y,r=0.05900/2.0;
     glPushMatrix();
@@ -328,11 +329,12 @@ void draw_spade(float cx,float cy){
     glEnd();
     glPopMatrix();
 }
+/*トランプを描画する関数*/
 void draw_card(float x,float y,cards *card,int count){
     int i;
-    float red;
-    for(i=0;i<count;i++){
-        if(card==dealer&&i==0&&mode==start){
+    float red;  //マークの色(赤か黒)
+    for(i=0;i<count;i++){//手札の枚数分繰り返す
+        if(card==dealer&&i==0&&mode==start){//ゲーム中のディーラーの一枚目は伏せておく
             glColor3d(0.6,0.2,0.2);
             glBegin(GL_QUADS);
             glVertex2d(x-0.1,  y-0.2);
@@ -343,6 +345,7 @@ void draw_card(float x,float y,cards *card,int count){
             x += 0.21;
             continue;
         }
+        //カードの描画
         glColor3d(1.0, 1.0, 1.0);
         glBegin(GL_QUADS);
         glVertex2d(x-0.1,  y-0.2);
@@ -350,6 +353,7 @@ void draw_card(float x,float y,cards *card,int count){
         glVertex2d(x+0.1,  y+0.2);
         glVertex2d(x-0.1,  y+0.2);
         glEnd();
+        //マークの描画
         switch (card[i].mark) {
             case heart:
                 draw_heart(x,y);
@@ -370,21 +374,21 @@ void draw_card(float x,float y,cards *card,int count){
             default:
                 break;
         }
+        //数字の描画
         glColor3d(red, 0.0, 0.0);
         output(x-0.09,y+0.14,card[i].num);
         output(x+0.05,y-0.18,card[i].num);
-        x += 0.21;
+        x += 0.21;//中心を隣に移す
     }
 }
-
+/*画面表示*/
 void disp(void)
  {
-     char c1[4];
-     char c2[4];
+     char c1[4],c2[4];//数値を描画する際に使用
      glClear(GL_COLOR_BUFFER_BIT);
      glColor3d(0.0, 0.0, 0.0);
-     output(-0.98,-0.95,"press q for quit");
-     if(mode==rule){
+     output(-0.98,-0.95,"press q for quit");//終了キーの表示
+     if(mode==rule){//ルール説明の表示
          output(-0.98,-0.85,"press p for playing game");
          float x=-0.5,y=0.8;
          glColor3d(0.0, 0.0, 0.0);
@@ -396,7 +400,7 @@ void disp(void)
          output(x,y-1.0,"-> The person with the most totale wins!");
          output(x,y-1.2,"-> Dealer draws cards until dealer's total exceed 17.");
      }
-     else if(mode==betting){
+     else if(mode==betting){//賭け金設定画面の表示
          sprintf(c1, "%d", tip);
          glColor3d(0.0, 0.0, 0.0);
          output(-0.98,-0.75,"press space to show rule");
@@ -407,18 +411,20 @@ void disp(void)
          if(errar==1){
              output(-0.25,0.1,"press number 1~ and enter");
          }
-         else{
+         else{//正しく入力されたらmodeをゲームプレイ状態にして再描画する
              errar=1;
              tip-=bet;
              mode=start;
              glutPostRedisplay();
          }
      }
-     else{
+     else{//ゲーム画面の表示
+         //両者の手札を描画
          draw_card(-0.6,0.5,dealer,dcount);
          draw_card(-0.6,-0.5,player,pcount);
          glColor3d(0.0, 0.0, 0.0);
-         output(-0.98,-0.85,"press space to show rule");
+         output(-0.98,-0.85,"press space to show rule");//ルール説明のキーを表示
+         //手持ちと賭け金の表示
          output(0.8,0.8,"your tips");
          sprintf(c1, "%d", tip);
          output(0.85,0.7,c1);
@@ -426,10 +432,12 @@ void disp(void)
          sprintf(c2, "%d", bet);
          output(0.85,0.5,c2);
          if(mode==start){
+             //プレイヤーの選択肢表示
+             glColor3d(0.0, 0.0, 0.0);
                output(-0.15,0.1,"press h for HIT");
                output(0.0,0.0,"or");
                output(-0.15,-0.1,"press s for STAND");
-               if(p_judge==2){
+               if(p_judge==2){//バーストした場合
                    result1=burst;
                    if(tip<=0){
                        mode=gameover;
@@ -438,28 +446,29 @@ void disp(void)
                        mode=end;
                    }
                }
-               else if(p_judge==1){
+               else if(p_judge==1){//STANDした、あるいは21ジャストの場合
                    d_judge = judge_dealer();
-                   while(d_judge==0){
+                   while(d_judge==0){//ディーラーの点数が17以上になるまで引き続ける
                        get_card(dealer,dcount);
                        dcount++;
                        d_judge = judge_dealer();
                        glutPostRedisplay();
                    }
-                   result1=judge_game();
+                   result1=judge_game();//勝敗判定
                }
              glutPostRedisplay();
          }
          else if(mode==end||mode==gameover){
-             if(mode==gameover){
-                 glColor3d(1.0, 0.0, 0.0);
+             glColor3d(1.0, 0.0, 0.0);
+             if(mode==gameover){//ゲームオーバーの場合
+                 
                  output(-0.05,-0.15,"GAME OVER");
-                 output(-0.06,-0.25,"press r for resset");
+                 output(-0.06,-0.25,"press r for resset");//リセットキーの表示
              }
              else{
-                 output(-0.1,-0.15,"press c for continue");
+                 output(-0.1,-0.15,"press c for continue");//続ける場合のキーを表示
              }
-             switch (result1) {
+             switch (result1) {//結果を表示
                  case win:
                      output(0.0,0.0,"you win!");
                      break;
@@ -487,6 +496,7 @@ void disp(void)
      glFlush();
      glutSwapBuffers();
  }
+/*背景画面*/
  void init(void)
  {
      if(mode==betting||mode==gameover){
@@ -500,23 +510,24 @@ void disp(void)
          float alpha = 0.0f/100.0f;  // 透明度
          glClearColor(red, green, blue, alpha);
  }
+/*キーボード入力*/
 void keyboard(unsigned char key, int x, int y) {
-    if(mode==betting){
+    if(mode==betting){//賭け金の入力
         static int i=0;
         if(key>='0'&&key<='9'){
             s[i]=key;
             i++;
         }
-        else if(key=='\015'){
+        else if(key=='\015'/*enter*/){
             bet=atoi(s);
-            if(s[0]=='\0'||bet>tip||bet<=0){
+            if(s[0]=='\0'||bet>tip||bet<=0){//入力された賭け金が範囲外の場合エラー
                 errar=1;
             }
             else{
                 errar=0;
             }
             i=0;
-            memset( s, '\0', sizeof(s) );
+            memset( s, '\0', sizeof(s) );//入力された値の初期化
         }
         glutPostRedisplay();
     }
@@ -524,9 +535,9 @@ void keyboard(unsigned char key, int x, int y) {
         case 'q':
         case 'Q':
         case '\033':  // esc
-          exit(0);
+          exit(0);//終了
           break;
-        case 'h':
+        case 'h'://HIT:カードを引く
           if(mode==start){
              get_card(player,pcount);
              pcount++;
@@ -534,32 +545,32 @@ void keyboard(unsigned char key, int x, int y) {
              glutPostRedisplay();
           }
           break;
-        case 's':
+        case 's'://STAND:勝負する
           if(mode==start){
              p_judge=1;
              glutPostRedisplay();
           }
           break;
-        case 'r':
+        case 'r'://リセット
           if(mode==gameover){
             init();
             glutPostRedisplay();
           }
           break;
-        case ' ':
-          pmode=mode;
+        case ' '://ルール説明
+          pmode=mode;//現在のモードを格納
           mode=rule;
           init();
           glutPostRedisplay();
           break;
-        case 'p':
+        case 'p'://ルール説明画面から前の状態に戻る
           if(mode==rule){
               mode=pmode;
               init();
               glutPostRedisplay();
           }
          break;
-        case 'c':
+        case 'c'://勝敗が決まった時ゲームを続ける
           if(mode==end){
             mode=betting;
             init();
